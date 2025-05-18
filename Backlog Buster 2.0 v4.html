@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Backlog Buster 2.0</title>
+
+  <!-- Inline CSS -->
+  <style>
+    /* Basic Reset & Fonts */
+    * {
+      margin: 0; 
+      padding: 0; 
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      /* Darker pink/purple gradient */
+      background: linear-gradient(135deg, #1a001a 0%, #2b002b 100%);
+      color: #fff;
+      min-height: 100vh;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1, h2, h3 {
+      margin-bottom: 10px;
+    }
+
+    /* Container for main content */
+    .container {
+      width: 100%;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    /* Task Creator & Reset */
+    .top-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      gap: 10px;
+    }
+    .top-controls button.reset-btn {
+      background-color: #d9534f;
+      border: none;
+      color: #fff;
+      padding: 10px 20px;
+      cursor: pointer;
+      border-radius: 6px;
+      font-size: 16px;
+    }
+    .top-controls button.reset-btn:hover {
+      background-color: #c9302c;
+    }
+
+    /* Task Input Form */
+    .task-input {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+    .task-input input {
+      padding: 10px;
+      font-size: 16px;
+      border-radius: 6px;
+      border: 1px solid #aaa;
+      outline: none;
+    }
+    .task-input button {
+      background-color: #5bc0de;
+      border: none;
+      color: #fff;
+      padding: 10px 20px;
+      cursor: pointer;
+      border-radius: 6px;
+      font-size: 16px;
+      transition: transform 0.2s ease;
+    }
+    .task-input button:hover {
+      transform: scale(1.05);
+      background-color: #31b0d5;
+    }
+
+    /* Task Cards Layout */
+    .task-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 20px;
+    }
+
+    .task-card {
+      background-color: rgba(255, 255, 255, 0.07);
+      border-radius: 10px;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.3s ease;
+    }
+    .task-card:hover {
+      transform: scale(1.02);
+    }
+
+    /* Running Indicator (emoji or icon) */
+    .running-indicator {
+      font-size: 24px;
+      margin-left: 10px;
+      animation: runPulse 1s infinite alternate;
+      display: inline-block;
+    }
+    @keyframes runPulse {
+      from {
+        transform: translateY(0);
+      }
+      to {
+        transform: translateY(-5px);
+      }
+    }
+
+    /* Task Card Buttons (Pastel Colors) */
+    .task-controls {
+      margin-top: 10px;
+      display: flex;
+      gap: 5px;
+    }
+    .task-controls button {
+      flex: 1;
+      border: none;
+      padding: 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .start-btn {
+      background: #b4eeb4; /* Pastel green */
+      color: #333;
+    }
+    .pause-btn {
+      background: #ffffcc; /* Pastel yellow */
+      color: #333;
+    }
+    .stop-btn {
+      background: #ffc2c2; /* Pastel red/pink */
+      color: #333;
+    }
+    .delete-btn {
+      background: #666;
+      color: #fff;
+      font-size: 14px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      outline: none;
+    }
+    .delete-btn:hover {
+      background: #999;
+    }
+
+    /* Timer Overlay */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    .overlay.active {
+      display: flex;
+    }
+    .overlay h2 {
+      font-size: 24px;
+      margin-bottom: 20px;
+    }
+    .timer-ring-container {
+      position: relative;
+      width: 200px;
+      height: 200px;
+      margin-bottom: 20px;
+    }
+    .timer-text {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      font-weight: bold;
+      color: #fff;
+    }
+    .overlay .overlay-controls {
+      display: flex;
+      gap: 10px;
+    }
+    .overlay button {
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-size: 16px;
+      border: none;
+      cursor: pointer;
+    }
+    .overlay .pause-btn {
+      background: #ffffcc; /* Pastel yellow */
+      color: #333;
+    }
+    .overlay .stop-btn {
+      background: #ffc2c2; /* Pastel red/pink */
+      color: #333;
+    }
+
+    /* Animated Circle for Timer (SVG) */
+    .progress-ring {
+      transform: rotate(-90deg);
+    }
+    .progress-ring circle {
+      fill: transparent;
+      stroke: #fff;
+      stroke-width: 12;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.35s;
+    }
+    .progress-ring-bg {
+      stroke-opacity: 0.2;
+    }
+
+    /* Flashing when nearing estimate */
+    .flash {
+      animation: flashAnim 0.5s alternate infinite;
+    }
+    @keyframes flashAnim {
+      from { color: #fff; }
+      to   { color: #ff4242; }
+    }
+
+    /* Break Overlay */
+    .break-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.95);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    .break-overlay.active {
+      display: flex;
+    }
+    .breathing-circle {
+      width: 150px;
+      height: 150px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #ffe2fa 0%, #f892ff 80%);
+      margin-bottom: 20px;
+      /* 12-second cycle: 4s expand, 8s reduce */
+      animation: breathe 12s infinite; 
+    }
+    @keyframes breathe {
+      0% { transform: scale(0.9); }
+      33.33% { transform: scale(1.1); }
+      100% { transform: scale(0.9); }
+    }
+    .break-overlay .break-time-remaining {
+      font-size: 32px;
+      margin-bottom: 20px;
+    }
+    .break-overlay button {
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-size: 16px;
+      border: none;
+      cursor: pointer;
+      background: #b4eeb4; /* Pastel green */
+      color: #333;
+    }
+
+    /* Pop-up for 30 min reminder */
+    .reminder-modal {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      background: #fff;
+      color: #333;
+      padding: 20px;
+      border-radius: 6px;
+      z-index: 999999;
+      transition: transform 0.3s ease;
+      max-width: 300px;
+      text-align: center;
+    }
+    .reminder-modal.show {
+      transform: translate(-50%, -50%) scale(1);
+    }
+    .reminder-modal button {
+      margin-top: 10px;
+      background: #b4eeb4; /* Pastel green */
+      color: #333;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    /* Leaderboard & Stats */
+    .stats-board {
+      margin-top: 20px;
+      background: rgba(255, 255, 255, 0.07);
+      padding: 15px;
+      border-radius: 6px;
+    }
+    .stats-board h3 {
+      margin-bottom: 10px;
+    }
+    .leaderboard-list {
+      list-style: none;
+      max-height: 200px;
+      overflow-y: auto;
+      padding: 0;
+    }
+    .leaderboard-list li {
+      padding: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.2);
+    }
+    .time-saved-display {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Backlog Buster 2.0</h1>
+
+    <!-- Top Controls (Reset, etc.) -->
+    <div class="top-controls">
+      <!-- Task Input -->
+      <div class="task-input">
+        <input type="text" id="taskName" placeholder="Task Name"/>
+        <input type="number" id="taskEstimate" placeholder="Est. Time (mins)" min="1"/>
+        <button onclick="createTask()">Add Task</button>
+      </div>
+      <!-- Reset Button -->
+      <button class="reset-btn" onclick="resetGame()">Reset Game</button>
+    </div>
+
+    <!-- Task Cards -->
+    <div class="task-list" id="taskList"></div>
+
+    <!-- Stats (Leaderboard, Time Saved) -->
+    <div class="stats-board">
+      <h3>Leaderboard (By % Saved)</h3>
+      <ul class="leaderboard-list" id="leaderboard"></ul>
+
+      <div class="time-saved-display" id="timeSavedDisplay">Total Time Saved: 0 mins</div>
+    </div>
+  </div>
+
+  <!-- Timer Overlay -->
+  <div class="overlay" id="timerOverlay">
+    <h2 id="currentTaskName"></h2>
+    <div class="timer-ring-container">
+      <!-- Animated Ring (SVG) -->
+      <svg class="progress-ring" width="200" height="200">
+        <circle class="progress-ring-bg" stroke="white" cx="100" cy="100" r="90"/>
+        <circle class="progress-ring-circle" stroke="white" cx="100" cy="100" r="90"
+                stroke-dasharray="565.48"
+                stroke-dashoffset="0"/>
+      </svg>
+      <div class="timer-text" id="timerText">00:00</div>
+    </div>
+    <div class="overlay-controls">
+      <button class="pause-btn" onclick="pauseActiveTask()">Pause</button>
+      <button class="stop-btn" onclick="stopActiveTask()">Stop</button>
+    </div>
+  </div>
+
+  <!-- Break Overlay -->
+  <div class="break-overlay" id="breakOverlay">
+    <h2>Break Time!</h2>
+    <div class="breathing-circle"></div>
+    <div class="break-time-remaining" id="breakTimer">00:00</div>
+    <button onclick="endBreak()">Skip Break</button>
+  </div>
+
+  <!-- 30-min Reminder Modal -->
+  <div class="reminder-modal" id="reminderModal">
+    <p>Don't forget your task!</p>
+    <button onclick="closeReminder()">Got it</button>
+  </div>
+
+  <!-- Inline JavaScript -->
+  <script>
+    /**************************************************************
+     * DATA STRUCTURES & GLOBALS
+     **************************************************************/
+    const MAX_TASKS = 5;
+    let tasks = []; 
+    let activeTaskId = null;
+    let timerInterval = null;
+    let reminderTimeout = null;
+
+    // Break settings
+    const BREAK_AFTER_TASKS = 3;
+    const BREAK_DURATION = 5 * 60; // 5 mins in seconds
+    let breakInterval = null;
+    let breakTimeLeft = BREAK_DURATION;
+
+    // Leaderboard & Time Saved
+    let totalTimeSaved = 0; // in minutes
+
+    // For ring animation
+    const FULL_DASH_ARRAY = 565.48; 
+    let totalSecondsEstimate = 0;    
+
+
+    /**************************************************************
+     * ON LOAD: Fetch tasks + stats from local storage
+     **************************************************************/
+    window.addEventListener('load', () => {
+      const storedTasks = localStorage.getItem('bb2_tasks');
+      if (storedTasks) {
+        tasks = JSON.parse(storedTasks);
+      }
+      const storedTimeSaved = localStorage.getItem('bb2_timeSaved');
+      if (storedTimeSaved) {
+        totalTimeSaved = parseInt(storedTimeSaved, 10) || 0;
+        document.getElementById('timeSavedDisplay').textContent = 
+          'Total Time Saved: ' + totalTimeSaved + ' mins';
+      }
+      displayTasks();
+      updateLeaderboard();
+    });
+
+
+    /**************************************************************
+     * CREATE NEW TASK
+     **************************************************************/
+    function createTask() {
+      const name = document.getElementById('taskName').value.trim();
+      const estimate = parseInt(document.getElementById('taskEstimate').value.trim(), 10);
+
+      if (!name || !estimate) {
+        alert('Please enter a valid task name and estimate.');
+        return;
+      }
+      if (tasks.length >= MAX_TASKS) {
+        alert('You already have 5 tasks. Please complete or remove one.');
+        return;
+      }
+
+      // Newly created tasks are not completed
+      const newTask = {
+        id: Date.now(),   
+        name,
+        estimate,         // in minutes
+        actual: 0,
+        isActive: false,
+        isPaused: false,
+        isCompleted: false, // <--- track completion
+        startTime: null,  
+        elapsed: 0        
+      };
+      tasks.push(newTask);
+      saveToLocalStorage();
+      displayTasks();
+
+      // Clear inputs
+      document.getElementById('taskName').value = '';
+      document.getElementById('taskEstimate').value = '';
+    }
+
+
+    /**************************************************************
+     * DISPLAY TASKS
+     **************************************************************/
+    function displayTasks() {
+      const taskList = document.getElementById('taskList');
+      taskList.innerHTML = '';
+
+      // Only show tasks that are NOT completed
+      tasks.forEach(task => {
+        if (task.isCompleted) {
+          return; // skip rendering completed tasks
+        }
+
+        // Build the task card
+        const card = document.createElement('div');
+        card.className = 'task-card';
+
+        // Delete Button
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'delete-btn';
+        deleteBtn.innerHTML = '×';
+        deleteBtn.onclick = () => confirmDeleteTask(task.id);
+        card.appendChild(deleteBtn);
+
+        // Task Name & Active Indicator
+        const title = document.createElement('h3');
+        title.textContent = task.name;
+        card.appendChild(title);
+
+        // Estimate
+        const estimateInfo = document.createElement('p');
+        estimateInfo.textContent = `Estimated: ${task.estimate} min`;
+        card.appendChild(estimateInfo);
+
+        // If running, show indicator
+        if (task.isActive && !task.isPaused) {
+          const runningIndicator = document.createElement('span');
+          runningIndicator.className = 'running-indicator';
+          runningIndicator.textContent = '🏃';
+          title.appendChild(runningIndicator);
+        }
+
+        // Card Buttons
+        const controls = document.createElement('div');
+        controls.className = 'task-controls';
+
+        // Start
+        const startBtn = document.createElement('button');
+        startBtn.className = 'start-btn';
+        startBtn.textContent = 'Start';
+        startBtn.onclick = () => startTask(task.id);
+
+        // Pause
+        const pauseBtn = document.createElement('button');
+        pauseBtn.className = 'pause-btn';
+        pauseBtn.textContent = 'Pause';
+        pauseBtn.onclick = () => pauseTask(task.id);
+
+        // Stop
+        const stopBtn = document.createElement('button');
+        stopBtn.className = 'stop-btn';
+        stopBtn.textContent = 'Stop';
+        stopBtn.onclick = () => stopTask(task.id);
+
+        controls.appendChild(startBtn);
+        controls.appendChild(pauseBtn);
+        controls.appendChild(stopBtn);
+        card.appendChild(controls);
+
+        taskList.appendChild(card);
+      });
+    }
+
+
+    /**************************************************************
+     * START, PAUSE, STOP TASK
+     **************************************************************/
+    function startTask(taskId) {
+      // If a task is already running, it must be paused/stopped first
+      if (activeTaskId && activeTaskId !== taskId) {
+        alert('Only one active timer allowed. Pause or stop the current task first.');
+        return;
+      }
+
+      const task = tasks.find(t => t.id === taskId);
+      if (!task || task.isCompleted) return;
+
+      task.isActive = true;
+      task.isPaused = false;
+      if (!task.startTime) {
+        // First time start
+        task.startTime = Date.now() - (task.elapsed * 1000);
+      } else {
+        // Resuming from pause
+        task.startTime = Date.now() - (task.elapsed * 1000);
+      }
+
+      activeTaskId = taskId;
+      totalSecondsEstimate = task.estimate * 60;
+      openTimerOverlay(task);
+      clearReminderTimeout();
+      displayTasks();
+    }
+
+    function pauseTask(taskId) {
+      const task = tasks.find(t => t.id === taskId);
+      if (!task || !task.isActive) return;
+
+      // If the task is active, we pause
+      if (!task.isPaused) {
+        task.isPaused = true;
+        task.elapsed = Math.floor((Date.now() - task.startTime) / 1000);
+        closeTimerOverlay();
+        startReminderTimeout();
+      } else {
+        // Resume if it's paused
+        task.isPaused = false;
+        task.startTime = Date.now() - task.elapsed * 1000;
+        openTimerOverlay(task);
+        clearReminderTimeout();
+      }
+      displayTasks();
+    }
+
+    /*
+      STOP: Marks the task as completed, 
+      so we do NOT remove it from 'tasks' array. 
+      Instead, we set isCompleted = true and 
+      hide it in displayTasks().
+    */
+    function stopTask(taskId) {
+      const task = tasks.find(t => t.id === taskId);
+      if (!task || !task.isActive) return;
+
+      // Finalize actual time
+      const now = Date.now();
+      const totalElapsed = Math.floor((now - task.startTime) / 1000);
+      task.actual = (task.elapsed > 0) 
+        ? task.elapsed + (totalElapsed - task.elapsed)
+        : totalElapsed;
+
+      // The task is no longer active or paused
+      task.isActive = false;
+      task.isPaused = false;
+
+      // Mark it as completed
+      task.isCompleted = true;
+
+      // Score & show results
+      showTaskResult(task);
+
+      // Close overlay & reminders
+      closeTimerOverlay();
+      clearReminderTimeout();
+
+      // Reset activeTaskId
+      activeTaskId = null;
+
+      // Check break
+      checkBreakCondition();
+
+      // Save & refresh display
+      saveToLocalStorage();
+      displayTasks();
+    }
+
+
+    /**************************************************************
+     * FULL-SCREEN TIMER OVERLAY LOGIC
+     **************************************************************/
+    function openTimerOverlay(task) {
+      const overlay = document.getElementById('timerOverlay');
+      overlay.classList.add('active');
+      document.getElementById('currentTaskName').textContent = task.name;
+      
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        updateOverlayTimer(task);
+      }, 1000);
+    }
+
+    function closeTimerOverlay() {
+      const overlay = document.getElementById('timerOverlay');
+      overlay.classList.remove('active');
+      if (timerInterval) clearInterval(timerInterval);
+    }
+
+    function updateOverlayTimer(task) {
+      // Calculate current elapsed
+      const now = Date.now();
+      const elapsedSec = Math.floor((now - task.startTime) / 1000);
+      task.elapsed = elapsedSec;
+      
+      // Update text
+      const min = Math.floor(elapsedSec / 60);
+      const sec = elapsedSec % 60;
+      const timeStr = String(min).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
+      const timerText = document.getElementById('timerText');
+      timerText.textContent = timeStr;
+
+      // Update ring
+      let fraction = elapsedSec / totalSecondsEstimate;
+      if (fraction > 1) fraction = 1; // Cap at 1 if exceeded
+      const offset = FULL_DASH_ARRAY - (FULL_DASH_ARRAY * fraction);
+      const circle = document.querySelector('.progress-ring-circle');
+      circle.style.strokeDashoffset = offset;
+
+      // Flash near the estimate (e.g., last 15% of time)
+      if (elapsedSec >= totalSecondsEstimate * 0.85 && elapsedSec < totalSecondsEstimate * 1.5) {
+        timerText.classList.add('flash');
+      } else {
+        timerText.classList.remove('flash');
+      }
+    }
+
+    /**************************************************************
+     * SCORING & RESULTS
+     **************************************************************/
+    function showTaskResult(task) {
+      const actualMin = task.actual / 60;
+      const estimateMin = task.estimate;
+
+      // Calculate % difference
+      const diff = estimateMin - actualMin; 
+      const percentFaster = (diff / estimateMin) * 100;
+
+      let scoreMsg;
+      if (percentFaster > 0) {
+        scoreMsg = `You worked ${percentFaster.toFixed(1)}% faster than your estimate!`;
+        // Minutes saved
+        const minutesSaved = diff.toFixed(1);
+        totalTimeSaved += parseFloat(minutesSaved);
+        document.getElementById('timeSavedDisplay').textContent =
+          'Total Time Saved: ' + Math.round(totalTimeSaved) + ' mins';
+      } else {
+        const slower = Math.abs(percentFaster).toFixed(1);
+        scoreMsg = `You were ${slower}% slower than your estimate. Keep trying!`;
+      }
+
+      alert(`Task "${task.name}" completed!\n${scoreMsg}`);
+
+      // Add to Leaderboard
+      const percentSaved = percentFaster > 0 ? percentFaster : 0; 
+      const lbEntry = {
+        id: task.id,
+        name: task.name,
+        percentSaved: percentSaved
+      };
+      storeLeaderboardEntry(lbEntry);
+
+      updateLeaderboard();
+      saveToLocalStorage();
+    }
+
+    /**************************************************************
+     * LEADERBOARD
+     **************************************************************/
+    function storeLeaderboardEntry(entry) {
+      let storedLB = localStorage.getItem('bb2_leaderboard');
+      let leaderboard = [];
+      if (storedLB) {
+        leaderboard = JSON.parse(storedLB);
+      }
+
+      // If entry already exists for this task, update it
+      const existing = leaderboard.find(e => e.id === entry.id);
+      if (existing) {
+        existing.percentSaved = Math.max(existing.percentSaved, entry.percentSaved);
+      } else {
+        leaderboard.push(entry);
+      }
+
+      localStorage.setItem('bb2_leaderboard', JSON.stringify(leaderboard));
+    }
+
+    function updateLeaderboard() {
+      const leaderboardEl = document.getElementById('leaderboard');
+      leaderboardEl.innerHTML = '';
+
+      let storedLB = localStorage.getItem('bb2_leaderboard');
+      if (!storedLB) return;
+
+      let leaderboard = JSON.parse(storedLB);
+      // Sort by % saved desc
+      leaderboard.sort((a, b) => b.percentSaved - a.percentSaved);
+
+      leaderboard.forEach((entry, idx) => {
+        const li = document.createElement('li');
+        li.textContent = `${idx + 1}. ${entry.name} - ${entry.percentSaved.toFixed(1)}% faster`;
+        leaderboardEl.appendChild(li);
+      });
+    }
+
+    /**************************************************************
+     * BREAK LOGIC
+     **************************************************************/
+    function checkBreakCondition() {
+      // Count tasks that are marked completed
+      const completedCount = tasks.filter(t => t.isCompleted).length;
+
+      if (completedCount % BREAK_AFTER_TASKS === 0 && completedCount !== 0) {
+        openBreakOverlay();
+      }
+    }
+
+    function openBreakOverlay() {
+      const breakOverlay = document.getElementById('breakOverlay');
+      breakOverlay.classList.add('active');
+      breakTimeLeft = BREAK_DURATION;
+      updateBreakTime();
+
+      if (breakInterval) clearInterval(breakInterval);
+      breakInterval = setInterval(() => {
+        breakTimeLeft--;
+        updateBreakTime();
+        if (breakTimeLeft <= 0) {
+          endBreak();
+        }
+      }, 1000);
+    }
+
+    function updateBreakTime() {
+      const mins = Math.floor(breakTimeLeft / 60);
+      const secs = breakTimeLeft % 60;
+      document.getElementById('breakTimer').textContent = 
+        `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+
+    function endBreak() {
+      const breakOverlay = document.getElementById('breakOverlay');
+      breakOverlay.classList.remove('active');
+      if (breakInterval) clearInterval(breakInterval);
+    }
+
+
+    /**************************************************************
+     * REMINDER FOR PAUSED TASKS (30 min)
+     **************************************************************/
+    function startReminderTimeout() {
+      clearReminderTimeout();
+      reminderTimeout = setTimeout(() => {
+        document.getElementById('reminderModal').classList.add('show');
+      }, 30 * 60 * 1000); // 30 minutes
+    }
+
+    function clearReminderTimeout() {
+      if (reminderTimeout) {
+        clearTimeout(reminderTimeout);
+        reminderTimeout = null;
+      }
+      document.getElementById('reminderModal').classList.remove('show');
+    }
+
+    function closeReminder() {
+      document.getElementById('reminderModal').classList.remove('show');
+    }
+
+
+    /**************************************************************
+     * DELETE TASK
+     **************************************************************/
+    function confirmDeleteTask(taskId) {
+      const confirmMsg = confirm('Are you sure you want to give up this task?');
+      if (confirmMsg) {
+        tasks = tasks.filter(t => t.id !== taskId);
+        saveToLocalStorage();
+        displayTasks();
+      }
+    }
+
+
+    /**************************************************************
+     * LOCAL STORAGE
+     **************************************************************/
+    function saveToLocalStorage() {
+      localStorage.setItem('bb2_tasks', JSON.stringify(tasks));
+      localStorage.setItem('bb2_timeSaved', totalTimeSaved.toString());
+    }
+
+
+    /**************************************************************
+     * RESET GAME
+     **************************************************************/
+    function resetGame() {
+      const sure = confirm('Are you sure you want to reset the entire game and leaderboard?');
+      if (!sure) return;
+
+      // Clear intervals/overlays
+      if (timerInterval) clearInterval(timerInterval);
+      if (breakInterval) clearInterval(breakInterval);
+      closeTimerOverlay();
+      endBreak();
+      clearReminderTimeout();
+
+      // Clear local storage
+      localStorage.removeItem('bb2_tasks');
+      localStorage.removeItem('bb2_timeSaved');
+      localStorage.removeItem('bb2_leaderboard');
+
+      // Reset arrays & UI
+      tasks = [];
+      totalTimeSaved = 0;
+      activeTaskId = null;
+      document.getElementById('taskList').innerHTML = '';
+      document.getElementById('leaderboard').innerHTML = '';
+      document.getElementById('timeSavedDisplay').textContent = 'Total Time Saved: 0 mins';
+      alert('Game reset complete!');
+    }
+
+    /**************************************************************
+     * HELPER: OVERLAY BUTTONS
+     **************************************************************/
+    function pauseActiveTask() {
+      if (!activeTaskId) return;
+      pauseTask(activeTaskId);
+    }
+    function stopActiveTask() {
+      if (!activeTaskId) return;
+      stopTask(activeTaskId);
+    }
+  </script>
+</body>
+</html>

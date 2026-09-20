@@ -1,0 +1,1473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Prioritizer</title>
+<style>
+  :root {
+    --bg: #08080b;
+    --panel: #111116;
+    --line: rgba(255,255,255,0.08);
+    --text: #f5f5f7;
+    --muted: #8b8b95;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+    overflow: hidden; /* absolutely no scrollbars */
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  /* ============================================================
+     IMPORT SCREEN
+     ============================================================ */
+  #importScreen {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 50% 20%, #14141c 0%, #08080b 70%);
+    padding: 24px;
+  }
+  #importScreen .box {
+    width: 100%;
+    max-width: 720px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 28px;
+  }
+  #importScreen h1 {
+    margin: 0 0 4px;
+    font-size: 1.4rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+  #importScreen p {
+    margin: 0 0 18px;
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+  #taskInput {
+    width: 100%;
+    height: 260px;
+    background: #0b0b10;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px;
+    color: var(--text);
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.82rem;
+    resize: vertical;
+    outline: none;
+  }
+  #taskInput:focus { border-color: #4a4a5e; }
+
+  .btnrow { display: flex; gap: 10px; margin-top: 16px; }
+  .btn {
+    border: none;
+    border-radius: 10px;
+    padding: 10px 18px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: transform .12s ease, filter .12s ease;
+    color: #fff;
+    white-space: nowrap;
+  }
+  .btn:hover { transform: translateY(-1px); filter: brightness(1.08); }
+  .btn:active { transform: translateY(0); }
+  .btn-primary { background: #4361ee; }
+  .btn-danger  { background: #b3261e; }
+  .btn-ghost   { background: #1c1c24; border: 1px solid var(--line); }
+
+  /* ============================================================
+     UPDATE DECK MODAL
+     ============================================================ */
+  #updateModal {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.75);
+    padding: 24px;
+  }
+  #updateModal.open { display: flex; }
+  #updateModal .box {
+    width: 100%;
+    max-width: 720px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 28px;
+  }
+  #updateModal h2 {
+    margin: 0 0 4px;
+    font-size: 1.2rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+  #updateModal p {
+    margin: 0 0 16px;
+    color: var(--muted);
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  #updateTaskInput {
+    width: 100%;
+    height: 260px;
+    background: #0b0b10;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px;
+    color: var(--text);
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.82rem;
+    resize: vertical;
+    outline: none;
+  }
+  #updateTaskInput:focus { border-color: #4a4a5e; }
+
+  /* ============================================================
+     TOP BAR
+     ============================================================ */
+  #topbar {
+    flex: 0 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--line);
+    background: #0a0a0e;
+  }
+  #topbar .title {
+    font-weight: 800;
+    font-size: 0.95rem;
+    letter-spacing: -0.01em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  #topbar .title .count {
+    color: var(--muted);
+    font-weight: 500;
+    font-size: 0.78rem;
+  }
+  #topbar .hint {
+    color: var(--muted);
+    font-size: 0.75rem;
+    display: none;
+    flex-basis: 100%;
+    order: 3;
+  }
+  @media (min-width: 900px) {
+    #topbar .hint { display: block; flex-basis: auto; order: 0; }
+  }
+
+  .viewToggle {
+    display: flex;
+    gap: 4px;
+    background: #111116;
+    padding: 3px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+  }
+  .viewToggle button {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .viewToggle button.active { background: #2a2a35; color: var(--text); }
+
+  .topActions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+  /* ============================================================
+     MAIN AREA (completed bar + board/orbit, stacked)
+     ============================================================ */
+  #mainArea {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ============================================================
+     COMPLETED BAR (pixel-style blocks, auto-fit into one row)
+     ============================================================ */
+  #completedBar {
+    flex: 0 0 35px;
+    display: flex;
+    align-items: stretch;
+    gap: 2px;
+    padding: 4px 6px;
+    background: #0a0a0e;
+    border-bottom: 1px solid var(--line);
+    overflow: hidden;
+  }
+  #completedBar.empty { display: none; }
+
+  .mini-tile {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  /* ============================================================
+     TILE BOARD (autofit grid)
+     ============================================================ */
+  #boardWrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 10px;
+  }
+  #board {
+    display: grid;
+    grid-auto-flow: dense;
+    gap: 8px;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  #emptyState, #orbitEmptyState {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    font-size: 0.9rem;
+    text-align: center;
+    padding: 24px;
+  }
+
+  /* ============================================================
+     TILE
+     ============================================================ */
+  .tile {
+    position: relative;
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 10px;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    border: 1px solid rgba(255,255,255,0.14);
+    transition: box-shadow .18s ease, filter .18s ease, transform .12s ease;
+    overflow: hidden;
+  }
+  .tile:hover { filter: brightness(1.08); }
+  .tile:active { transform: scale(0.98); }
+  .tile.long-pressing { filter: brightness(0.75) saturate(60%); }
+
+  .tile .txt {
+    font-weight: 600;
+    line-height: 1.25;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 5;
+    -webkit-box-orient: vertical;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  }
+  .tile .meta {
+    margin-top: 6px;
+    opacity: 0.75;
+    font-size: 0.7em;
+    font-weight: 500;
+  }
+  .tile .tier-dots {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    display: flex;
+    gap: 2px;
+  }
+  .tile .tier-dots span {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.28);
+  }
+  .tile .tier-dots span.on { background: rgba(255,255,255,0.95); }
+
+  /* Tier-based glow + weight, layered onto category color.
+     Tiers 1-3 scale gently; 4 and 5 step up sharply, and 5 gets an
+     exclusive pulsing glow + border so it's unmistakably top of stack.
+     These rules apply to both tile view and orbit-circle view so the
+     two views read as the same priority system. */
+  .tile.tier-1, .orbit-circle.tier-1 { font-weight: 400; box-shadow: 0 0 0 rgba(0,0,0,0); }
+  .tile.tier-2, .orbit-circle.tier-2 { font-weight: 500; box-shadow: 0 2px 10px rgba(0,0,0,0.25); }
+  .tile.tier-3, .orbit-circle.tier-3 { font-weight: 600; box-shadow: 0 3px 16px rgba(0,0,0,0.3); }
+  .tile.tier-4, .orbit-circle.tier-4 {
+    font-weight: 700;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4), 0 0 22px var(--glow, transparent);
+    border: 1px solid rgba(255,255,255,0.3);
+  }
+  .tile.tier-5, .orbit-circle.tier-5 {
+    font-weight: 800;
+    box-shadow: 0 10px 44px rgba(0,0,0,0.55), 0 0 48px var(--glow, transparent), 0 0 80px var(--glow, transparent);
+    border: 2px solid rgba(255,255,255,0.6);
+    animation: tier5Pulse 2.4s ease-in-out infinite;
+  }
+
+  @keyframes tier5Pulse {
+    0%, 100% {
+      box-shadow: 0 10px 44px rgba(0,0,0,0.55), 0 0 48px var(--glow, transparent), 0 0 80px var(--glow, transparent);
+    }
+    50% {
+      box-shadow: 0 14px 56px rgba(0,0,0,0.65), 0 0 65px var(--glow, transparent), 0 0 110px var(--glow, transparent);
+    }
+  }
+
+  .tile.tier-1 .txt { font-size: 0.7rem; }
+  .tile.tier-2 .txt { font-size: 0.84rem; }
+  .tile.tier-3 .txt { font-size: 1.0rem; }
+  .tile.tier-4 .txt { font-size: 1.4rem; }
+  .tile.tier-5 .txt { font-size: 2.1rem; }
+
+  .tile.tier-1 { opacity: 0.72; }
+  .tile.tier-2 { opacity: 0.85; }
+
+  /* Category colors — shared by tiles, orbit circles and the mini bar */
+  .cat-work     { background: #4a3d8f; --glow: #715dd7; }
+  .cat-chores   { background: #3d6f8f; --glow: #5daed7; }
+  .cat-lila     { background: #3d8f6b; --glow: #5dd7a2; }
+  .cat-reward   { background: #4c8f3d; --glow: #75d75d; }
+  .cat-personal { background: #8f8a3d; --glow: #d2d75d; }
+  .cat-routine  { background: #8f3d3d; --glow: #d75d5d; }
+  .cat-fuel     { background: #8f3d63; --glow: #d75d9c; }
+
+  /* ============================================================
+     ORBIT VIEW (Bleh)
+     ============================================================ */
+  #orbitWrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    position: relative;
+    overflow: hidden;
+    background: radial-gradient(circle at 50% 42%, #131320 0%, #08080b 75%);
+  }
+
+  .bleh {
+    position: absolute;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #0f1115;
+    font-weight: 800;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.45), inset 0 -10px 24px rgba(0,0,0,0.25);
+    user-select: none;
+    z-index: 20;
+    transition: background-color .35s linear, width .35s ease, height .35s ease, left .35s ease, top .35s ease;
+  }
+  .bleh .label {
+    pointer-events: none;
+    font-size: clamp(9px, 1.5vw, 15px);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    text-align: center;
+    line-height: 1.25;
+    padding: 6%;
+    max-width: 100%;
+    overflow-wrap: break-word;
+  }
+
+  .orbit-circle {
+    position: absolute;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    text-align: center;
+    color: #fff;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    border: 1px solid rgba(255,255,255,0.14);
+    box-shadow: 0 8px 22px rgba(0,0,0,0.35);
+    transition: transform .18s ease, box-shadow .18s ease, width .25s ease, height .25s ease, filter .18s ease;
+    z-index: 30;
+    will-change: left, top;
+  }
+  .orbit-circle:active { filter: brightness(0.85); }
+  .orbit-circle.long-pressing { filter: brightness(0.7) saturate(60%); }
+
+  /* Hover = "fit to text": scale up and un-clamp, without disturbing
+     the element's layout box (so its orbit position math stays correct). */
+  .orbit-circle:hover {
+    transform: scale(1.9);
+    z-index: 80;
+    box-shadow: 0 20px 55px rgba(0,0,0,0.6);
+  }
+  .orbit-circle .txt {
+    font-weight: 700;
+    line-height: 1.15;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    pointer-events: none;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+    word-break: break-word;
+  }
+  .orbit-circle:hover .txt {
+    -webkit-line-clamp: unset;
+    overflow: visible;
+  }
+
+  /* Work tasks: show the generic "Work" label by default (their real
+     names tend to run long), reveal the actual task name on hover. */
+  .orbit-circle .txt .txt-full { display: none; }
+  .orbit-circle:hover .txt .txt-short { display: none; }
+  .orbit-circle:hover .txt .txt-full { display: inline; }
+
+  .orbit-circle.tier-1 .txt { font-size: 0.58rem; }
+  .orbit-circle.tier-2 .txt { font-size: 0.66rem; }
+  .orbit-circle.tier-3 .txt { font-size: 0.76rem; }
+  .orbit-circle.tier-4 .txt { font-size: 0.88rem; }
+  .orbit-circle.tier-5 .txt { font-size: 1.02rem; }
+  .orbit-circle:hover .txt { font-size: 0.85rem; }
+
+  /* "In progress" lock state (right-click): subtle pulsing ring, no
+     interference with the hover scale/transform. */
+  @keyframes circleInProgressPulse {
+    0%, 100% { box-shadow: 0 8px 22px rgba(0,0,0,0.35), 0 0 0 0 rgba(255,255,255,0.16); }
+    50%      { box-shadow: 0 8px 22px rgba(0,0,0,0.35), 0 0 0 5px rgba(255,255,255,0.05); }
+  }
+  .orbit-circle.locked {
+    animation: circleInProgressPulse 2.4s ease-in-out infinite;
+  }
+
+  .orbit-circle .timer-label {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 6px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: rgba(0,0,0,0.55);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: var(--muted);
+    font-size: 0.6rem;
+    font-weight: 600;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .2s ease;
+  }
+  .orbit-circle.locked .timer-label {
+    opacity: 1;
+  }
+
+  .particle {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 60;
+    will-change: transform, opacity;
+  }
+
+  .catLegend {
+    display: none;
+    gap: 10px;
+    font-size: 0.7rem;
+    color: var(--muted);
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .catLegend .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+  @media (min-width: 1100px) { .catLegend { display: flex; } }
+</style>
+</head>
+<body>
+
+  <!-- ============================================================
+       IMPORT SCREEN
+       ============================================================ -->
+  <div id="importScreen">
+    <div class="box">
+      <h1>Prioritizer</h1>
+      <p>Paste your markdown task list. Tasks under <strong>## In Progress</strong> and <strong>## Uncompleted</strong> become priority tiles/circles. Tasks under <strong>## Done</strong> / <strong>## Completed</strong> show up as a mini strip along the top. Use <code>#Work #Chores #Personal #Reward #Lila #Routine #Fuel</code> tags for color, and optional <code>[10:00AM]</code> for time. Switch between Tiles and Circles view anytime from the top bar.</p>
+      <textarea id="taskInput" placeholder="## In Progress
+- [10:00AM] Draft proposal #Work
+
+## Uncompleted
+- [2:00PM] Clean kitchen #Chores
+- Call the dentist #Personal
+
+## Done
+- Morning workout #Reward"></textarea>
+      <div class="btnrow">
+        <button class="btn btn-primary" onclick="importDeck()">Import Tasks</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       TOP BAR
+       ============================================================ -->
+  <div id="topbar">
+    <div class="title">Prioritizer <span class="count" id="taskCount"></span></div>
+    <div class="hint" id="hintText"></div>
+    <div class="catLegend" id="catLegend"></div>
+    <div class="topActions">
+      <div class="viewToggle">
+        <button id="viewTilesBtn" class="active" onclick="setView('tiles')">Tiles</button>
+        <button id="viewCirclesBtn" onclick="setView('circles')">Circles</button>
+      </div>
+      <button class="btn btn-ghost" style="padding:6px 14px; font-size:0.78rem;" onclick="launchAsteroidGame()">🚀 Asteroid</button>
+      <button class="btn btn-ghost" style="padding:6px 14px; font-size:0.78rem;" onclick="openUpdateModal()">Update Deck</button>
+      <button class="btn btn-danger" style="padding:6px 14px; font-size:0.78rem;" onclick="resetEverything()">Reset</button>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       UPDATE DECK MODAL
+       ============================================================ -->
+  <div id="updateModal">
+    <div class="box">
+      <h2>Update Deck</h2>
+      <p>Paste your full, current task list. <strong>## In Progress</strong> / <strong>## Uncompleted</strong> tasks that match an existing tile keep its priority tier; new ones start at the default tier. Tasks no longer in this list — including anything moved to <strong>## Done</strong> / <strong>## Completed</strong> or <strong>## Won't Do</strong> — disappear from the board. The <strong>## Done</strong> / <strong>## Completed</strong> section also replaces the mini strip at the top.</p>
+      <textarea id="updateTaskInput" placeholder="## In Progress
+- [10:00AM] Draft proposal #Work
+
+## Uncompleted
+- [2:00PM] Clean kitchen #Chores
+
+## Done
+- Morning workout #Reward
+
+## Won't Do
+- Reorganize garage #Chores"></textarea>
+      <div class="btnrow">
+        <button class="btn btn-primary" onclick="processUpdateDeck()">Apply Update</button>
+        <button class="btn btn-ghost" onclick="closeUpdateModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       COMPLETED BAR + VIEWS
+       ============================================================ -->
+  <div id="mainArea">
+    <div id="completedBar" class="empty"></div>
+
+    <div id="boardWrap">
+      <div id="board"></div>
+    </div>
+
+    <div id="orbitWrap" style="display:none;">
+      <div class="bleh" id="bleh"><div class="label" id="blehLabel">Bleh</div></div>
+      <div id="orbitEmptyState" style="display:none;">No tasks. Reset to import a new list.</div>
+    </div>
+  </div>
+
+<script>
+  // ============================================================
+  // CONFIG
+  // ============================================================
+  const STORAGE_KEY = 'prioritizer_deck_v1';
+  const VIEW_KEY = 'prioritizer_view_v1';
+  const KNOWN_CATEGORIES = ['Work', 'Chores', 'Personal', 'Reward', 'Lila', 'Routine', 'Fuel'];
+  const CATEGORY_CLASS = {
+    Work: 'cat-work', Chores: 'cat-chores', Lila: 'cat-lila',
+    Reward: 'cat-reward', Personal: 'cat-personal', Routine: 'cat-routine',
+    Fuel: 'cat-fuel'
+  };
+  // Same hex values as the CSS cat-* classes, kept in JS for Bleh's color
+  // blending and particle bursts so both views always agree on color.
+  const CATEGORY_COLOR = {
+    Work: '#4a3d8f', Chores: '#3d6f8f', Lila: '#3d8f6b', Reward: '#4c8f3d',
+    Personal: '#8f8a3d', Routine: '#8f3d3d', Fuel: '#8f3d63'
+  };
+
+  const MIN_TIER = 1;
+  const MAX_TIER = 5;
+  const DEFAULT_TIER = 1;
+  const CATEGORY_MIN_TIER = { Work: 2 }; // #Work tasks can never drop below this tier
+  const LONG_PRESS_MS = 500;
+  const MOVE_CANCEL_PX = 12;
+
+  function minTierFor(task) {
+    return CATEGORY_MIN_TIER[task.category] || MIN_TIER;
+  }
+
+  function defaultTierFor(task) {
+    return Math.max(DEFAULT_TIER, minTierFor(task));
+  }
+
+  const TILE_HINT = 'Click = raise priority · Right-click / long-press = lower priority · Space+D = quick update from clipboard';
+  const ORBIT_HINT = 'Tap = raise priority (completes it at tier 5) · Right-click / long-press = lower priority · Hover a circle to read it in full';
+
+  // ============================================================
+  // ELEMENT REFS
+  // ============================================================
+  const importScreen = document.getElementById('importScreen');
+  const taskInput = document.getElementById('taskInput');
+  const board = document.getElementById('board');
+  const boardWrapEl = document.getElementById('boardWrap');
+  const orbitWrapEl = document.getElementById('orbitWrap');
+  const orbitEmptyStateEl = document.getElementById('orbitEmptyState');
+  const blehEl = document.getElementById('bleh');
+  const blehLabelEl = document.getElementById('blehLabel');
+  const completedBarEl = document.getElementById('completedBar');
+  const taskCountEl = document.getElementById('taskCount');
+  const hintTextEl = document.getElementById('hintText');
+  const catLegendEl = document.getElementById('catLegend');
+
+  // ============================================================
+  // STATE
+  // ============================================================
+  let tasks = []; // { __id, text, category, displayTime, tier, key }
+  let completed = []; // { text, category, displayTime, key } — display only, no tier
+  let currentView = 'tiles'; // 'tiles' | 'circles'
+
+  // Orbit-only, transient (not persisted) animation state, keyed by task.key
+  // so circles keep their angle/identity across re-renders instead of
+  // jumping around every time a tier changes.
+  const orbitState = {};
+  const orbitCenter = { x: 0, y: 0 };
+  let orbitRAF = null;
+  let orbitLastTs = null;
+
+  // ============================================================
+  // MARKDOWN PARSING (In Progress + Uncompleted only)
+  // ============================================================
+  function parseMarkdown(md) {
+    const lines = md.split('\n');
+    let section = '';
+    const priority = [];
+    const completedItems = [];
+
+    for (let raw of lines) {
+      const line = raw.trim();
+      if (!line) continue;
+
+      if (line.startsWith('##')) {
+        section = line.replace(/^##\s*/, '').trim();
+        continue;
+      }
+
+      const isPriority = /in progress/i.test(section) || /uncompleted/i.test(section);
+      const isCompleted = /done|complete/i.test(section);
+      if (!isPriority && !isCompleted) continue;
+
+      let bodyText = null;
+      let displayTime = '';
+
+      if (line.startsWith('- [')) {
+        const match = line.match(/\[(.*?)\]\s*(.*)/);
+        if (!match) continue;
+        const [, datetime, rest] = match;
+        bodyText = rest;
+        const timeOnly = datetime.match(/\b(\d{1,2}:\d{2}\s*[APap][Mm])\b/);
+        displayTime = timeOnly ? timeOnly[1].replace(/\s+/g, '').toUpperCase() : '';
+      } else if (line.startsWith('- ')) {
+        bodyText = line.replace(/^- /, '').trim();
+      } else {
+        continue;
+      }
+
+      let category = 'Routine';
+      const tagMatches = bodyText.match(/#(\w+)/g);
+      if (tagMatches) {
+        for (const rawTag of tagMatches) {
+          const normalized = rawTag.substring(1).toLowerCase();
+          const found = KNOWN_CATEGORIES.find(c => c.toLowerCase() === normalized);
+          if (found) { category = found; break; }
+        }
+      }
+
+      const visibleText = bodyText.replace(/#\w+/g, '').trim();
+      if (!visibleText) continue;
+
+      const item = { text: visibleText, category, displayTime, key: visibleText.toLowerCase() };
+      if (isPriority) priority.push(item);
+      else completedItems.push(item);
+    }
+
+    return { priority, completed: completedItems };
+  }
+
+  // ============================================================
+  // PERSISTENCE
+  // ============================================================
+  function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, completed }));
+  }
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        if (!parsed.length) return false;
+        tasks = parsed;
+        completed = [];
+        return true;
+      }
+      if (!parsed || !Array.isArray(parsed.tasks) || !parsed.tasks.length) return false;
+      tasks = parsed.tasks;
+      completed = Array.isArray(parsed.completed) ? parsed.completed : [];
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function importDeck() {
+    const parsed = parseMarkdown(taskInput.value);
+    if (!parsed.priority.length) {
+      alert('No tasks found under "## In Progress" or "## Uncompleted" sections.');
+      return;
+    }
+    tasks = parsed.priority.map((t, i) => ({ ...t, __id: i, tier: defaultTierFor(t) }));
+    completed = parsed.completed;
+    for (const k of Object.keys(orbitState)) { orbitState[k].el.remove(); delete orbitState[k]; }
+    save();
+    importScreen.style.display = 'none';
+    refreshAll();
+  }
+
+  // ============================================================
+  // UPDATE DECK (merge new list, keep existing priorities)
+  // ============================================================
+  const updateModal = document.getElementById('updateModal');
+  const updateTaskInput = document.getElementById('updateTaskInput');
+
+  function openUpdateModal() {
+    updateTaskInput.value = '';
+    updateModal.classList.add('open');
+  }
+
+  function closeUpdateModal() {
+    updateModal.classList.remove('open');
+  }
+
+  function processUpdateDeck() {
+    const parsed = parseMarkdown(updateTaskInput.value);
+    if (!parsed.priority.length && !parsed.completed.length) {
+      alert('No tasks found under "## In Progress", "## Uncompleted", "## Done", or "## Completed" sections.');
+      return;
+    }
+
+    const existingTiers = {};
+    tasks.forEach(t => { existingTiers[t.key] = t.tier; });
+
+    tasks = parsed.priority.map((t, i) => ({
+      ...t,
+      __id: i,
+      tier: existingTiers.hasOwnProperty(t.key)
+        ? Math.max(existingTiers[t.key], minTierFor(t))
+        : defaultTierFor(t)
+    }));
+
+    completed = parsed.completed;
+
+    save();
+    closeUpdateModal();
+    refreshAll();
+  }
+
+  function resetEverything() {
+    if (!confirm('Clear all tasks and priorities? This cannot be undone.')) return;
+    localStorage.removeItem(STORAGE_KEY);
+    location.reload();
+  }
+
+  // ============================================================
+  // SHARED REFRESH — called after any tier change, absorb, import, etc.
+  // ============================================================
+  function updateTaskCount() {
+    taskCountEl.textContent = tasks.length ? `${tasks.length} task${tasks.length === 1 ? '' : 's'}` : '';
+  }
+
+  function refreshAll() {
+    updateTaskCount();
+    renderBoard();
+    renderOrbit();
+    renderCompletedBar();
+  }
+
+  // ============================================================
+  // VIEW SWITCHING
+  // ============================================================
+  function updateHintText() {
+    hintTextEl.textContent = currentView === 'circles' ? ORBIT_HINT : TILE_HINT;
+  }
+
+  function renderCatLegend() {
+    catLegendEl.innerHTML = KNOWN_CATEGORIES.map(cat =>
+      `<span><span class="dot" style="background:${CATEGORY_COLOR[cat]}"></span>${cat}</span>`
+    ).join('');
+  }
+
+  function setView(view) {
+    currentView = view;
+    localStorage.setItem(VIEW_KEY, view);
+    document.getElementById('viewTilesBtn').classList.toggle('active', view === 'tiles');
+    document.getElementById('viewCirclesBtn').classList.toggle('active', view === 'circles');
+    boardWrapEl.style.display = view === 'tiles' ? 'block' : 'none';
+    orbitWrapEl.style.display = view === 'circles' ? 'block' : 'none';
+    updateHintText();
+
+    if (view === 'tiles') {
+      if (orbitRAF) { cancelAnimationFrame(orbitRAF); orbitRAF = null; orbitLastTs = null; }
+      if (tasks.length) requestAnimationFrame(recalcLayout);
+    } else {
+      setupOrbitCenter();
+      renderOrbit();
+      if (!orbitRAF) { orbitLastTs = null; orbitRAF = requestAnimationFrame(animateOrbit); }
+    }
+  }
+
+  // ============================================================
+  // AUTOFIT GRID LAYOUT (Tile view)
+  // ============================================================
+  const SPAN_BY_TIER = { 1: 1, 2: 2, 3: 3, 4: 5, 5: 7 };
+
+  function recalcLayout() {
+    const rect = board.getBoundingClientRect();
+    const width = Math.max(rect.width, 1);
+    const height = Math.max(rect.height, 1);
+    const aspect = width / height;
+
+    const tileEls = [...board.children];
+    const spans = tileEls.map(el => SPAN_BY_TIER[parseInt(el.dataset.tier, 10)] || SPAN_BY_TIER[MIN_TIER]);
+    const totalUnits = spans.reduce((sum, s) => sum + s * s, 0) || 1;
+
+    let cols = Math.max(1, Math.round(Math.sqrt(totalUnits * aspect)));
+    let rows = Math.max(1, Math.ceil(totalUnits / cols));
+
+    const maxSpan = Math.max(...spans, 1);
+    cols = Math.max(cols, maxSpan);
+    rows = Math.max(rows, maxSpan);
+
+    board.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    board.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+
+    tileEls.forEach((el, i) => {
+      const span = Math.min(spans[i], cols, rows);
+      el.style.gridColumn = `span ${span}`;
+      el.style.gridRow = `span ${span}`;
+    });
+  }
+
+  // ============================================================
+  // TILE RENDERING
+  // ============================================================
+  function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>"']/g, c => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+  }
+
+  function tierDotsHtml(tier) {
+    let html = '<div class="tier-dots">';
+    for (let i = 1; i <= MAX_TIER; i++) {
+      html += `<span class="${i <= tier ? 'on' : ''}"></span>`;
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function renderBoard() {
+    board.innerHTML = '';
+
+    if (!tasks.length) {
+      const empty = document.createElement('div');
+      empty.id = 'emptyState';
+      empty.textContent = 'No tasks. Reset to import a new list.';
+      board.appendChild(empty);
+      return;
+    }
+
+    const ordered = [...tasks].sort((a, b) => b.tier - a.tier || a.__id - b.__id);
+
+    ordered.forEach(task => {
+      const catClass = CATEGORY_CLASS[task.category] || CATEGORY_CLASS.Routine;
+      const tile = document.createElement('div');
+      tile.className = `tile ${catClass} tier-${task.tier}`;
+      tile.dataset.id = task.__id;
+      tile.dataset.tier = task.tier;
+
+      tile.innerHTML = `
+        ${tierDotsHtml(task.tier)}
+        <div class="txt">${escapeHtml(task.text)}</div>
+        ${task.displayTime ? `<div class="meta">${escapeHtml(task.displayTime)}</div>` : ''}
+      `;
+
+      attachTileInteractions(tile, task);
+      board.appendChild(tile);
+    });
+
+    if (currentView === 'tiles') requestAnimationFrame(recalcLayout);
+  }
+
+  function renderCompletedBar() {
+    completedBarEl.innerHTML = '';
+
+    if (!completed.length) {
+      completedBarEl.classList.add('empty');
+      return;
+    }
+    completedBarEl.classList.remove('empty');
+
+    completed.forEach(task => {
+      const catClass = CATEGORY_CLASS[task.category] || CATEGORY_CLASS.Routine;
+      const mini = document.createElement('div');
+      mini.className = `mini-tile ${catClass}`;
+      mini.title = task.text;
+      completedBarEl.appendChild(mini);
+    });
+  }
+
+  // ============================================================
+  // PRIORITY CHANGES (shared by tile view and orbit view)
+  // ============================================================
+  function changeTier(task, delta) {
+    const newTier = Math.max(minTierFor(task), Math.min(MAX_TIER, task.tier + delta));
+    if (newTier === task.tier) return;
+    task.tier = newTier;
+    save();
+    renderBoard();
+    renderOrbit();
+  }
+
+  function attachTileInteractions(tile, task) {
+    tile.addEventListener('click', () => {
+      if (tile.__suppressClick) { tile.__suppressClick = false; return; }
+      changeTier(task, +1);
+    });
+
+    tile.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      changeTier(task, -1);
+    });
+
+    let pressTimer = null;
+    let startX = 0, startY = 0;
+
+    tile.addEventListener('touchstart', (e) => {
+      const touch = e.touches[0];
+      startX = touch.clientX;
+      startY = touch.clientY;
+      tile.classList.add('long-pressing');
+
+      pressTimer = setTimeout(() => {
+        tile.classList.remove('long-pressing');
+        tile.__suppressClick = true;
+        changeTier(task, -1);
+      }, LONG_PRESS_MS);
+    }, { passive: true });
+
+    tile.addEventListener('touchmove', (e) => {
+      const touch = e.touches[0];
+      const dx = Math.abs(touch.clientX - startX);
+      const dy = Math.abs(touch.clientY - startY);
+      if (dx > MOVE_CANCEL_PX || dy > MOVE_CANCEL_PX) {
+        clearTimeout(pressTimer);
+        tile.classList.remove('long-pressing');
+      }
+    }, { passive: true });
+
+    tile.addEventListener('touchend', () => {
+      clearTimeout(pressTimer);
+      tile.classList.remove('long-pressing');
+    });
+
+    tile.addEventListener('touchcancel', () => {
+      clearTimeout(pressTimer);
+      tile.classList.remove('long-pressing');
+    });
+  }
+
+  // ============================================================
+  // ORBIT VIEW (Bleh) — same tasks, tier drives distance from center
+  // ============================================================
+  const BLEH_BASE_HEX = '#7a7f85';
+  const BLEND_FACTOR = 0.2; // each absorb nudges Bleh 20% toward the new category color
+
+  const SIZE_BY_TIER = { 1: 46, 2: 58, 3: 72, 4: 118, 5: 168 };
+  // Every task shares one orbit — beads on a necklace — instead of a
+  // separate ring per tier.
+  const ORBIT_RADIUS_FRAC = 0.34; // fraction of the orbit area's smaller dimension
+  const ORBIT_SPEED = 0.00012;    // radians/ms, shared by every bead so the necklace turns as one piece
+  const NECKLACE_GAP_PX = 14;     // breathing room between beads, before scaling
+  let necklaceRadius = 0;         // px, recomputed each renderOrbit() (resize-safe, same pattern as positionBleh)
+
+  function hexToRgb(hex) {
+    const s = hex.replace('#', '');
+    const v = s.length === 3 ? s.split('').map(c => c + c).join('') : s;
+    const n = parseInt(v, 16);
+    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+  }
+  function rgbToHex({ r, g, b }) {
+    const to = n => Math.round(n).toString(16).padStart(2, '0');
+    return '#' + to(r) + to(g) + to(b);
+  }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function blendRgb(curr, next, t) {
+    return { r: lerp(curr.r, next.r, t), g: lerp(curr.g, next.g, t), b: lerp(curr.b, next.b, t) };
+  }
+
+  function getOrbitMinDim() {
+    const rect = orbitWrapEl.getBoundingClientRect();
+    return Math.max(1, Math.min(rect.width, rect.height));
+  }
+
+  // Bleh's color and size are derived purely from the completed list —
+  // no separate score/XP is tracked, this is just a visual growth history.
+  function computeBlehColor() {
+    let rgb = hexToRgb(BLEH_BASE_HEX);
+    for (const item of completed) {
+      const hex = CATEGORY_COLOR[item.category] || CATEGORY_COLOR.Routine;
+      rgb = blendRgb(rgb, hexToRgb(hex), BLEND_FACTOR);
+    }
+    return rgb;
+  }
+
+  function computeBlehDiameter(minDim) {
+    const base = 110;
+    const maxExtra = minDim * 0.5;
+    const growth = maxExtra * (1 - Math.exp(-completed.length / 10));
+    return Math.min(base + growth, minDim * 0.62);
+  }
+
+  function setupOrbitCenter() {
+    const rect = orbitWrapEl.getBoundingClientRect();
+    orbitCenter.x = rect.width / 2;
+    orbitCenter.y = rect.height / 2;
+  }
+
+  function positionBleh() {
+    const minDim = getOrbitMinDim();
+    const d = computeBlehDiameter(minDim);
+    const rgb = computeBlehColor();
+    blehEl.style.width = d + 'px';
+    blehEl.style.height = d + 'px';
+    blehEl.style.left = (orbitCenter.x - d / 2) + 'px';
+    blehEl.style.top = (orbitCenter.y - d / 2) + 'px';
+    blehEl.style.background = rgbToHex(rgb);
+    updateBlehLabel();
+  }
+
+  // The bottom-most task under ## Done / ## Completed in the pasted
+  // markdown is the oldest completed entry (first one ever logged),
+  // since newer completions get added above it. That's completed[]'s
+  // last item, since items are pushed in the same top-to-bottom order
+  // they appear in the markdown.
+  function updateBlehLabel() {
+    if (!completed.length) {
+      blehLabelEl.textContent = 'Bleh';
+      return;
+    }
+    const count = completed.length;
+    const firstLogged = completed[completed.length - 1];
+    const since = firstLogged.displayTime ? firstLogged.displayTime : 'the start';
+    blehLabelEl.textContent = `${count} task${count === 1 ? '' : 's'} completed since ${since}`;
+  }
+
+
+
+
+  function renderOrbit() {
+    updateTaskCount();
+
+    // Drop orbit circles for tasks that no longer exist (completed, deleted, etc.)
+    const currentKeys = new Set(tasks.map(t => t.key));
+    for (const key of Object.keys(orbitState)) {
+      if (!currentKeys.has(key)) {
+        if (orbitState[key].timerInterval) clearInterval(orbitState[key].timerInterval);
+        orbitState[key].el.remove();
+        delete orbitState[key];
+      }
+    }
+
+    if (!tasks.length) {
+      orbitEmptyStateEl.style.display = 'flex';
+      positionBleh();
+      return;
+    }
+    orbitEmptyStateEl.style.display = 'none';
+
+    const minDim = getOrbitMinDim();
+    const scaleFactor = Math.max(0.55, Math.min(1.15, minDim / 760));
+    necklaceRadius = minDim * ORBIT_RADIUS_FRAC;
+    const gapPx = NECKLACE_GAP_PX * scaleFactor;
+
+    // Necklace order: tier 5 beads first, then 4, then 3, then 2, then 1 —
+    // tasks.forEach below still builds/updates every circle, this copy just
+    // decides where each one sits around the single shared ring.
+    const necklaceOrder = tasks.slice().sort((a, b) => b.tier - a.tier);
+
+    tasks.forEach(task => {
+      let state = orbitState[task.key];
+      if (!state) {
+        const el = document.createElement('div');
+        el.className = 'orbit-circle';
+        el.innerHTML = `<div class="txt"></div><div class="timer-label"></div>`;
+        orbitWrapEl.appendChild(el);
+        state = {
+          el, angle: Math.random() * Math.PI * 2, offset: 0, paused: false,
+          locked: false, lockedAt: null, timerInterval: null
+        };
+        orbitState[task.key] = state;
+        attachCircleInteractions(el, state);
+      }
+      state.task = task;
+
+      const catClass = CATEGORY_CLASS[task.category] || CATEGORY_CLASS.Routine;
+      const isWork = task.category === 'Work';
+      state.el.className = `orbit-circle ${catClass} tier-${task.tier}${state.locked ? ' locked' : ''}`;
+
+      const txtEl = state.el.querySelector('.txt');
+      if (task.tier <= 2) {
+        // Tier 1-2: solid color circle only, no text at all.
+        txtEl.innerHTML = '';
+      } else if (isWork) {
+        // Work tasks show a generic "Work" label; the real (often long)
+        // task name only appears on hover, via CSS.
+        txtEl.innerHTML = `<span class="txt-short">Work</span><span class="txt-full">${escapeHtml(task.text)}</span>`;
+      } else {
+        txtEl.textContent = task.text;
+      }
+
+      const diameter = Math.round(SIZE_BY_TIER[task.tier] * scaleFactor);
+      state.diameter = diameter;
+      state.el.style.width = diameter + 'px';
+      state.el.style.height = diameter + 'px';
+    });
+
+    // Second pass: lay every bead around the single necklace ring, in tier
+    // order, sized proportionally to each bead's own diameter so big beads
+    // claim more of the ring and nothing overlaps.
+    const circumference = 2 * Math.PI * necklaceRadius;
+    let totalAngle = 0;
+    const rawWidths = necklaceOrder.map(task => {
+      const state = orbitState[task.key];
+      const w = ((state.diameter + gapPx) / circumference) * Math.PI * 2;
+      totalAngle += w;
+      return w;
+    });
+    const normalize = totalAngle > 0 ? (Math.PI * 2) / totalAngle : 0;
+    let cursor = 0;
+    necklaceOrder.forEach((task, i) => {
+      const state = orbitState[task.key];
+      const angleWidth = rawWidths[i] * normalize;
+      state.offset = cursor + angleWidth / 2;
+      cursor += angleWidth;
+      if (!state.paused) state.angle = necklaceRotation + state.offset; // sync immediately so a resize/reorder doesn't jump
+    });
+
+    positionBleh();
+  }
+
+  let necklaceRotation = 0;
+
+  function animateOrbit(ts) {
+    if (currentView !== 'circles') { orbitRAF = null; return; }
+    if (orbitLastTs == null) orbitLastTs = ts;
+    const dt = ts - orbitLastTs;
+    orbitLastTs = ts;
+
+    // The whole necklace turns together at one shared speed; an individual
+    // bead only ever breaks formation while paused (hovered or locked),
+    // freezing in place, then snaps back onto the ring once released.
+    necklaceRotation += ORBIT_SPEED * dt;
+
+    for (const key in orbitState) {
+      const st = orbitState[key];
+      if (!st.paused) st.angle = necklaceRotation + st.offset;
+      const x = orbitCenter.x + Math.cos(st.angle) * necklaceRadius;
+      const y = orbitCenter.y + Math.sin(st.angle) * necklaceRadius;
+      st.el.style.left = (x - st.diameter / 2) + 'px';
+      st.el.style.top = (y - st.diameter / 2) + 'px';
+    }
+    orbitRAF = requestAnimationFrame(animateOrbit);
+  }
+
+  function spawnParticles(x, y, color, count = 14) {
+    for (let i = 0; i < count; i++) {
+      const p = document.createElement('div');
+      p.className = 'particle';
+      p.style.left = (x - 4) + 'px';
+      p.style.top = (y - 4) + 'px';
+      p.style.background = color;
+      orbitWrapEl.appendChild(p);
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 30 + Math.random() * 80;
+      const tx = Math.cos(angle) * dist;
+      const ty = Math.sin(angle) * dist;
+      const dur = 420 + Math.random() * 260;
+      p.animate([
+        { transform: 'translate(0,0) scale(1)', opacity: 1 },
+        { transform: `translate(${tx}px, ${ty}px) scale(0.5)`, opacity: 0 }
+      ], { duration: dur, easing: 'cubic-bezier(.16,.84,.44,1)' });
+      setTimeout(() => p.remove(), dur + 30);
+    }
+  }
+
+  // Tier 5 is the "top of stack" tier in both views. In tile view you just
+  // stay maxed out there. In orbit view, tapping a maxed-out circle instead
+  // completes it — Bleh absorbs it, it drops into the completed strip.
+  // There's no undo/confirmation on this, by design, to keep it quick.
+  function handleCirclePrimary(task) {
+    if (task.tier >= MAX_TIER) {
+      absorbTask(task);
+    } else {
+      changeTier(task, +1);
+    }
+  }
+
+  function absorbTask(task) {
+    const state = orbitState[task.key];
+    if (state) {
+      const rect = state.el.getBoundingClientRect();
+      const wrapRect = orbitWrapEl.getBoundingClientRect();
+      const color = CATEGORY_COLOR[task.category] || CATEGORY_COLOR.Routine;
+      spawnParticles(
+        rect.left - wrapRect.left + rect.width / 2,
+        rect.top - wrapRect.top + rect.height / 2,
+        color
+      );
+      state.el.style.transition = 'opacity .25s ease, transform .25s ease';
+      state.el.style.opacity = '0';
+      state.el.style.transform = 'scale(0.3)';
+      const elToRemove = state.el;
+      setTimeout(() => { elToRemove.remove(); }, 260);
+      if (state.timerInterval) clearInterval(state.timerInterval);
+      delete orbitState[task.key];
+    }
+
+    const idx = tasks.findIndex(t => t.key === task.key);
+    if (idx >= 0) tasks.splice(idx, 1);
+    completed.push({ text: task.text, category: task.category, displayTime: task.displayTime || '', key: task.key });
+
+    save();
+    updateTaskCount();
+    renderBoard();
+    renderCompletedBar();
+    positionBleh();
+  }
+
+  // Right-click ("in progress") lock: freezes the circle's orbit position
+  // (same paused mechanism as hover), starts a live elapsed-time label, and
+  // adds a subtle pulse. Nothing here is persisted — it's purely visual and
+  // resets if the page reloads or the task leaves the orbit.
+  function lockCircle(state) {
+    if (state.locked) return;
+    state.locked = true;
+    state.paused = true;
+    state.lockedAt = Date.now();
+    state.el.classList.add('locked');
+
+    const timerEl = state.el.querySelector('.timer-label');
+    const updateTimerText = () => {
+      const mins = Math.floor((Date.now() - state.lockedAt) / 60000);
+      timerEl.textContent = `In progress for ${mins} mins`;
+    };
+    updateTimerText();
+    state.timerInterval = setInterval(updateTimerText, 15000);
+  }
+
+  function attachCircleInteractions(el, state) {
+    el.addEventListener('mouseenter', () => { state.paused = true; });
+    el.addEventListener('mouseleave', () => { if (!state.locked) state.paused = false; });
+
+    el.addEventListener('click', () => {
+      if (el.__suppressClick) { el.__suppressClick = false; return; }
+      handleCirclePrimary(state.task);
+    });
+
+    el.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  changeTier(state.task, -1);
+  lockCircle(state);
+
+  // Start TickTick Pomodoro via AutoHotkey
+  triggerPomodoro();
+});
+
+    let pressTimer = null;
+    let startX = 0, startY = 0;
+
+    el.addEventListener('touchstart', (e) => {
+      const touch = e.touches[0];
+      startX = touch.clientX;
+      startY = touch.clientY;
+      el.classList.add('long-pressing');
+
+      pressTimer = setTimeout(() => {
+        el.classList.remove('long-pressing');
+        el.__suppressClick = true;
+        changeTier(state.task, -1);
+      }, LONG_PRESS_MS);
+    }, { passive: true });
+
+    el.addEventListener('touchmove', (e) => {
+      const touch = e.touches[0];
+      const dx = Math.abs(touch.clientX - startX);
+      const dy = Math.abs(touch.clientY - startY);
+      if (dx > MOVE_CANCEL_PX || dy > MOVE_CANCEL_PX) {
+        clearTimeout(pressTimer);
+        el.classList.remove('long-pressing');
+      }
+    }, { passive: true });
+
+    el.addEventListener('touchend', () => {
+      clearTimeout(pressTimer);
+      el.classList.remove('long-pressing');
+    });
+
+    el.addEventListener('touchcancel', () => {
+      clearTimeout(pressTimer);
+      el.classList.remove('long-pressing');
+    });
+  }
+
+  // ============================================================
+  // KEYBOARD MACRO: Space + D — quick update from clipboard
+  // ============================================================
+  function isEditableTarget(el) {
+    if (!el) return false;
+    return el.tagName === 'TEXTAREA' || el.tagName === 'INPUT' || el.isContentEditable;
+  }
+
+  async function quickUpdateFromClipboard() {
+    let text;
+    try {
+      text = await navigator.clipboard.readText();
+    } catch (err) {
+      alert('Could not read the clipboard. Your browser may need clipboard permission for this page.');
+      return;
+    }
+
+    if (!text || !text.trim()) {
+      alert('Clipboard is empty.');
+      return;
+    }
+
+    openUpdateModal();
+    updateTaskInput.value = text;
+    processUpdateDeck();
+  }
+
+  let spaceHeld = false;
+
+  document.addEventListener('keydown', (e) => {
+    if (isEditableTarget(document.activeElement)) return;
+
+    if (e.code === 'Space') {
+      spaceHeld = true;
+      e.preventDefault();
+      return;
+    }
+
+    if (spaceHeld && e.key.toLowerCase() === 'd') {
+      e.preventDefault();
+      spaceHeld = false;
+      quickUpdateFromClipboard();
+    }
+
+    if (spaceHeld && e.key.toLowerCase() === 'a') {
+      e.preventDefault();
+      spaceHeld = false;
+      launchAsteroidGame();
+    }
+  });
+
+  document.addEventListener('keyup', (e) => {
+    if (e.code === 'Space') spaceHeld = false;
+  });
+
+  // ============================================================
+  // KEYBOARD MACRO / BUTTON: Space + A — launch Asteroid Defender loaded
+  // with every current tier-4/5 task, 30-minute timer
+  // ============================================================
+  // If you move the Asteroid Defender file, update this path.
+  const ASTEROID_GAME_PATH =
+    'C:\\Users\\kyrie\\OneDrive - INSIGNE CARPETS PVT. LTD\\Desktop\\My Games\\Asteroid\\Asteriod - 12\\index v2.html';
+  const ASTEROID_LAUNCH_MINUTES = 30;
+  const ASTEROID_LAUNCH_TIERS = [4, 5];
+
+  function windowsPathToFileUrl(path) {
+    const parts = path.replace(/\\/g, '/').split('/');
+    const encoded = parts.map((part, i) => (i === 0 ? part : encodeURIComponent(part)));
+    return 'file:///' + encoded.join('/');
+  }
+
+  function launchAsteroidGame() {
+    const targets = tasks.filter(t => ASTEROID_LAUNCH_TIERS.includes(t.tier));
+    if (!targets.length) {
+      alert('No tier 4 or 5 tasks right now — nothing to launch at Earth.');
+      return;
+    }
+    const markdown = targets.map(t => `- ${t.text}`).join('\n');
+    const params = new URLSearchParams({
+      minutes: String(ASTEROID_LAUNCH_MINUTES),
+      tasks: markdown,
+    });
+    const url = `${windowsPathToFileUrl(ASTEROID_GAME_PATH)}#${params.toString()}`;
+    console.log('[Asteroid launch]', url);
+    window.location.href = url;
+  }
+
+  // ============================================================
+  // BOOT
+  // ============================================================
+  window.addEventListener('resize', () => {
+    if (currentView === 'tiles' && tasks.length) recalcLayout();
+    if (currentView === 'circles') { setupOrbitCenter(); renderOrbit(); }
+  });
+
+  renderCatLegend();
+
+  const savedView = localStorage.getItem(VIEW_KEY) === 'circles' ? 'circles' : 'tiles';
+
+  if (load()) {
+    importScreen.style.display = 'none';
+  }
+  updateTaskCount();
+  renderBoard();
+  renderCompletedBar();
+  setView(savedView);
+</script>
+</body>
+</html>
